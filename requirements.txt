@@ -1,0 +1,32 @@
+# LAIGCD Requirements
+
+# PyTorch (根据CUDA版本选择)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# CLIP模型
+open-clip-torch>=2.23.0
+
+# 图像处理
+Pillow>=9.0.0
+opencv-python>=4.7.0
+
+# 频域处理（可选）
+PyWavelets>=1.4.0
+
+# 数据处理
+numpy>=1.24.0
+scikit-learn>=1.2.0
+
+# 可视化
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# 进度条
+tqdm>=4.65.0
+
+# Transformers（用于替代的CLIP加载方式）
+transformers>=4.30.0
+
+# 模型优化
+timm>=0.9.0
