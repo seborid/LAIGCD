@@ -61,7 +61,7 @@ case $MODE in
         ;;
     full)
         # 完整训练：使用全部数据
-        MAX_SAMPLES=null
+        MAX_SAMPLES=""
         EPOCHS=30
         BATCH_SIZE=32
         SAVE_FREQ=5
@@ -118,33 +118,37 @@ echo "=================================================="
 # 训练命令
 # ================================================================
 
-python scripts/train.py \
-    --data_path "$DATA_PATH" \
-    --output_dir "$OUTPUT_DIR" \
-    --max_samples $MAX_SAMPLES \
+# 构建命令（根据MAX_SAMPLES是否为空）
+CMD="python scripts/train.py \
+    --data_path \"$DATA_PATH\" \
+    --output_dir \"$OUTPUT_DIR\" \
     --epochs $EPOCHS \
     --batch_size $BATCH_SIZE \
     --num_workers $NUM_WORKERS \
     --img_size $IMG_SIZE \
-    \
-    --clip_model "$CLIP_MODEL" \
+    --clip_model \"$CLIP_MODEL\" \
     --num_prototypes $NUM_PROTOTYPES \
     --use_freq \
-    --freq_type "$FREQ_TYPE" \
+    --freq_type \"$FREQ_TYPE\" \
     --dropout $DROPOUT \
-    \
     --lr $LR \
     --weight_decay $WEIGHT_DECAY \
     --warmup_epochs $WARMUP_EPOCHS \
     --clip_grad_norm $CLIP_GRAD_NORM \
-    \
     --use_amp \
     --use_ema \
     --ema_decay $EMA_DECAY \
-    \
     --save_freq $SAVE_FREQ \
     --print_freq 50 \
-    --device cuda
+    --device cuda"
+
+# 如果设置了MAX_SAMPLES，添加该参数
+if [ -n "$MAX_SAMPLES" ]; then
+    CMD="--max_samples $MAX_SAMPLES $CMD"
+fi
+
+# 执行命令
+eval $CMD
 
 echo ""
 echo "=================================================="
