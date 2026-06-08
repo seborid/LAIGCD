@@ -5,7 +5,7 @@
 import time
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from timm.utils import ModelEmaV2
 from collections import defaultdict
 import numpy as np
@@ -77,7 +77,7 @@ def train_one_epoch(
     model.train()
 
     # 混合精度训练
-    scaler = GradScaler() if config.get('use_amp', True) else None
+    scaler = GradScaler('cuda') if config.get('use_amp', True) else None
 
     # 梯度累积
     accumulation_steps = config.get('accumulation_steps', 1)
@@ -90,13 +90,20 @@ def train_one_epoch(
     header = f'Epoch: [{epoch}]'
     start_time = time.time()
 
-    for i, (images, labels) in enumerate(metric_logger.log_every(dataloader, print_freq, header)):
-        images = images.to(device)
-        labels = labels.to(device)
+    for i, batch in enumerate(metric_logger.log_every(dataloader, print_freq, header)):
+        # 处理字典格式的数据
+        if isinstance(batch, dict):
+            images = batch['image']
+            labels = batch['label']
+        else:
+            images, labels = batch
+
+        images = images.to(device, non_blocking=True)
+        labels = labels.to(device, non_blocking=True)
 
         # 前向传播（混合精度）
         if scaler is not None:
-            with autocast():
+            with autocast(device_type='cuda'):
                 logits = model(images)
                 loss = model.get_criterion(logits, labels)
                 loss = loss / accumulation_steps  # 梯度累积
@@ -173,9 +180,16 @@ def validate(model, dataloader, device):
     total_loss = 0.0
     num_batches = 0
 
-    for images, labels in dataloader:
-        images = images.to(device)
-        labels = labels.to(device)
+    for batch in dataloader:
+        # 处理字典格式的数据
+        if isinstance(batch, dict):
+            images = batch['image']
+            labels = batch['label']
+        else:
+            images, labels = batch
+
+        images = images.to(device, non_blocking=True)
+        labels = labels.to(device, non_blocking=True)
 
         logits = model(images)
         loss = model.get_criterion(logits, labels)
