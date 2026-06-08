@@ -68,7 +68,6 @@ from utils import (
     train_one_epoch, validate, save_checkpoint, load_checkpoint
 )
 from utils.metrics import compute_metrics, print_metrics
-from utils.viz import plot_training_curves
 
 
 def get_args_parser():
@@ -288,23 +287,10 @@ def main(args):
     logger.info(f"最佳验证AP: {best_ap:.4f}")
     logger.info(f"模型保存位置: {output_dir}/best_model.pth")
     logger.info("="*50)
-
-    # 绘制训练曲线
-    if len(train_losses) > 0:
-        plot_training_curves(
-            train_losses, val_metrics_history,
-            save_path=output_dir / 'training_curves.png'
-        )
-        logger.info(f"训练曲线已保存: {output_dir}/training_curves.png")
+    logger.info("使用 'python scripts/visualize_results.py' 查看训练曲线")
 
 
 if __name__ == "__main__":
     parser = get_args_parser()
     args = parser.parse_args()
-
-    # 设置中文显示（可选）
-    import matplotlib as mpl
-    mpl.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
-    mpl.rcParams['axes.unicode_minus'] = False
-
     main(args)
