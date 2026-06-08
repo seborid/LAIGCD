@@ -8,13 +8,59 @@ import os
 import sys
 import argparse
 import time
+import logging
 from pathlib import Path
+from datetime import datetime
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import torch
 from timm.utils import ModelEmaV2
+
+
+def setup_logger(output_dir, console_level=logging.INFO):
+    """
+    设置日志系统
+
+    - 控制台：只输出关键信息 (INFO级别)
+    - 文件：输出详细日志 (DEBUG级别)
+    """
+    # 创建输出目录
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # 日志文件名（带时间戳）
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = output_dir / f'train_{timestamp}.log'
+
+    # 创建logger
+    logger = logging.getLogger('LAIGCD')
+    logger.setLevel(logging.DEBUG)
+
+    # 清除已有的处理器
+    logger.handlers.clear()
+
+    # 格式化器
+    formatter = logging.Formatter(
+        '%(asctime)s | %(levelname)-8s | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    # 文件处理器：记录所有详细日志
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    # 控制台处理器：只显示重要信息
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(console_level)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    logger.info(f"日志文件: {log_file}")
+    return logger
 
 from models import build_model
 from utils import (
@@ -82,13 +128,16 @@ def get_args_parser():
 
 def main(args):
     """主训练函数"""
-    # 设置设备
-    device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
-    print(f"使用设备: {device}")
-
     # 创建输出目录
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # 设置日志系统
+    logger = setup_logger(output_dir)
+
+    # 设置设备
+    device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+    logger.info(f"使用设备: {device}")
 
     # 保存配置
     config = vars(args)
@@ -96,21 +145,31 @@ def main(args):
     with open(output_dir / 'config.json', 'w') as f:
         json.dump(config, f, indent=2)
 
-    # 打印配置
-    print("\n" + "="*50)
-    print("训练配置:")
+    # 记录配置（简化输出）
+    logger.info("="*50)
+    logger.info("训练配置:")
+    key_configs = ['max_samples', 'epochs', 'batch_size', 'lr', 'use_freq']
+    for k in key_configs:
+        if k in config and config[k] is not None:
+            logger.info(f"  {k}: {config[k]}")
+    logger.debug("完整配置:")
     for k, v in config.items():
-        print(f"  {k}: {v}")
-    print("="*50 + "\n")
+        logger.debug(f"  {k}: {v}")
+    logger.info("="*50)
 
     # 构建模型
-    print("构建模型...")
+    logger.info("构建模型...")
     model = build_model(config)
     model = model.to(device)
-    model.print_model_info()
+
+    # 记录模型信息
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logger.debug(f"模型参数: 总计 {total_params:,}, 可训练 {trainable_params:,}")
+    logger.info(f"可训练参数: {trainable_params:,}")
 
     # 创建数据加载器
-    print("准备数据...")
+    logger.info("准备数据...")
     datasets_list = args.datasets.split(',') if args.datasets else None
 
     train_loader = get_train_dataloader(
@@ -133,8 +192,8 @@ def main(args):
         subset_mode=args.subset_mode
     )
 
-    print(f"训练集: {len(train_loader.dataset)} 样本")
-    print(f"验证集: {len(val_loader.dataset)} 样本\n")
+    logger.info(f"训练集: {len(train_loader.dataset)} 样本")
+    logger.info(f"验证集: {len(val_loader.dataset)} 样本")
 
     # 创建优化器
     optimizer = torch.optim.AdamW(
@@ -160,7 +219,7 @@ def main(args):
     best_ap = 0.0
 
     if args.resume:
-        print(f"从检查点恢复: {args.resume}")
+        logger.info(f"从检查点恢复: {args.resume}")
         start_epoch, ckpt_metrics = load_checkpoint(
             args.resume, model, optimizer, scheduler, ema_model
         )
@@ -169,37 +228,40 @@ def main(args):
 
     # 仅评估模式
     if args.eval_only:
-        print("\n评估模式...")
+        logger.info("评估模式...")
         model_to_eval = ema_model.module if ema_model else model
         metrics = validate(model_to_eval, val_loader, device)
-        print_metrics(metrics, prefix="验证集")
+        logger.info(f"验证准确率: {metrics['accuracy']:.4f}, AP: {metrics['ap']:.4f}")
         return
 
     # 训练循环
-    print("开始训练...\n")
+    logger.info("开始训练...")
     train_losses = []
     val_metrics_history = []
 
     for epoch in range(start_epoch, args.epochs):
         epoch_start = time.time()
 
+        logger.info(f"Epoch {epoch+1}/{args.epochs} 开始")
+
         # 训练一个epoch
         train_metrics = train_one_epoch(
             model, train_loader, optimizer, scheduler,
-            device, epoch, config, ema_model
+            device, epoch, config, ema_model, logger=logger
         )
         train_losses.append(train_metrics.meters['loss'][-1])
 
         # 验证
         model_to_eval = ema_model.module if ema_model else model
-        val_metrics = validate(model_to_eval, val_loader, device)
+        val_metrics = validate(model_to_eval, val_loader, device, logger=logger)
         val_metrics_history.append(val_metrics)
 
-        # 打印结果
-        print_metrics(val_metrics, prefix=f"Epoch {epoch}")
+        # 输出结果（简化）
+        logger.info(f"Epoch {epoch+1} | Val Loss: {val_metrics['loss']:.4f} | "
+                   f"Acc: {val_metrics['accuracy']:.4f} | AP: {val_metrics['ap']:.4f}")
 
         epoch_time = time.time() - epoch_start
-        print(f"Epoch {epoch} 总耗时: {epoch_time:.2f}s\n")
+        logger.debug(f"Epoch {epoch+1} 耗时: {epoch_time:.2f}s")
 
         # 保存最佳模型
         if val_metrics['ap'] > best_ap:
@@ -209,19 +271,23 @@ def main(args):
                 model, optimizer, scheduler, epoch, val_metrics,
                 save_path, ema_model
             )
-            print(f"保存最佳模型 (AP: {best_ap:.4f})")
+            logger.info(f"★ 保存最佳模型 (AP: {best_ap:.4f})")
 
         # 定期保存
         if (epoch + 1) % args.save_freq == 0:
-            save_path = output_dir / f'checkpoint_epoch_{epoch}.pth'
+            save_path = output_dir / f'checkpoint_epoch_{epoch+1}.pth'
             save_checkpoint(
                 model, optimizer, scheduler, epoch, val_metrics,
                 save_path, ema_model
             )
+            logger.debug(f"保存检查点: {save_path}")
 
     # 训练结束，保存最终结果
-    print("\n训练完成！")
-    print(f"最佳验证AP: {best_ap:.4f}")
+    logger.info("="*50)
+    logger.info("训练完成！")
+    logger.info(f"最佳验证AP: {best_ap:.4f}")
+    logger.info(f"模型保存位置: {output_dir}/best_model.pth")
+    logger.info("="*50)
 
     # 绘制训练曲线
     if len(train_losses) > 0:
@@ -229,6 +295,7 @@ def main(args):
             train_losses, val_metrics_history,
             save_path=output_dir / 'training_curves.png'
         )
+        logger.info(f"训练曲线已保存: {output_dir}/training_curves.png")
 
 
 if __name__ == "__main__":

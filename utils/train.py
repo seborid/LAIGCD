@@ -56,7 +56,8 @@ def train_one_epoch(
     device,
     epoch,
     config,
-    ema_model=None
+    ema_model=None,
+    logger=None
 ):
     """
     训练一个epoch
@@ -70,6 +71,7 @@ def train_one_epoch(
         epoch: 当前epoch
         config: 配置字典
         ema_model: EMA模型（可选）
+        logger: 日志记录器（可选）
 
     Returns:
         metric_logger: 指标记录器
@@ -154,14 +156,19 @@ def train_one_epoch(
 
     # 打印统计
     epoch_time = time.time() - start_time
-    print(f"Epoch {epoch} 训练时间: {epoch_time:.2f}s")
-    print(f"Averaged stats: {metric_logger}")
+    avg_loss = np.mean(metric_logger.meters['loss']) if 'loss' in metric_logger.meters else 0
+
+    if logger:
+        logger.debug(f"Epoch {epoch} 训练时间: {epoch_time:.2f}s")
+        logger.debug(f"Averaged stats: {metric_logger}")
+    else:
+        print(f"Epoch {epoch} 训练时间: {epoch_time:.2f}s")
 
     return metric_logger
 
 
 @torch.no_grad()
-def validate(model, dataloader, device):
+def validate(model, dataloader, device, logger=None):
     """
     验证/测试
 
@@ -169,6 +176,7 @@ def validate(model, dataloader, device):
         model: 模型
         dataloader: 数据加载器
         device: 设备
+        logger: 日志记录器（可选）
 
     Returns:
         metrics: 指标字典
