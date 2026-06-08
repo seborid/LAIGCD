@@ -42,28 +42,28 @@ case $MODE in
         # 调试模式：快速验证代码能跑通
         MAX_SAMPLES=100
         EPOCHS=3
-        BATCH_SIZE=32
+        BATCH_SIZE=64
         SAVE_FREQ=1
         ;;
     quick)
         # 快速测试：验证模型能收敛
         MAX_SAMPLES=1000
         EPOCHS=5
-        BATCH_SIZE=32
+        BATCH_SIZE=64
         SAVE_FREQ=2
         ;;
     standard)
         # 标准测试：中等规模，验证效果
         MAX_SAMPLES=10000
         EPOCHS=15
-        BATCH_SIZE=32
+        BATCH_SIZE=64
         SAVE_FREQ=5
         ;;
     full)
         # 完整训练：使用全部数据
         MAX_SAMPLES=""
         EPOCHS=30
-        BATCH_SIZE=32
+        BATCH_SIZE=64
         SAVE_FREQ=5
         ;;
     *)

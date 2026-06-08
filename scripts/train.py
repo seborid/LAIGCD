@@ -96,8 +96,8 @@ def get_args_parser():
 
     # 训练
     parser.add_argument('--epochs', type=int, default=30, help='训练轮数')
-    parser.add_argument('--batch_size', type=int, default=16, help='批次大小')
-    parser.add_argument('--accumulation_steps', type=int, default=2, help='梯度累积步数')
+    parser.add_argument('--batch_size', type=int, default=64, help='批次大小')
+    parser.add_argument('--accumulation_steps', type=int, default=1, help='梯度累积步数')
     parser.add_argument('--lr', type=float, default=1e-4, help='学习率')
     parser.add_argument('--weight_decay', type=float, default=0.01, help='权重衰减')
     parser.add_argument('--warmup_epochs', type=int, default=3, help='warmup轮数')
