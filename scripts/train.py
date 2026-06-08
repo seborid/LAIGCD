@@ -30,9 +30,15 @@ def get_args_parser():
     parser = argparse.ArgumentParser('LAIGCD训练', add_help=False)
 
     # 数据集
-    parser.add_argument('--data_path', type=str, required=True, help='数据集根目录')
+    parser.add_argument('--data_path', type=str, default='data', help='数据集根目录')
     parser.add_argument('--img_size', type=int, default=224, help='输入图像大小')
     parser.add_argument('--num_workers', type=int, default=4, help='数据加载线程数')
+    parser.add_argument('--datasets', type=str, default='140k,130k',
+                        help='使用的数据集，逗号分隔 (如: 140k,130k 或 140k 或 130k)')
+    parser.add_argument('--max_samples', type=int, default=None,
+                        help='小规模测试模式：限制样本数 (None=全部, train推荐1000/10000)')
+    parser.add_argument('--subset_mode', type=str, default='balanced', choices=['balanced', 'random'],
+                        help='小规模采样模式: balanced-保持类别平衡, random-随机采样')
 
     # 模型
     parser.add_argument('--clip_model', type=str, default='ViT-B-32', help='CLIP模型')
@@ -105,11 +111,16 @@ def main(args):
 
     # 创建数据加载器
     print("准备数据...")
+    datasets_list = args.datasets.split(',') if args.datasets else None
+
     train_loader = get_train_dataloader(
         data_path=args.data_path,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        img_size=args.img_size
+        img_size=args.img_size,
+        datasets=datasets_list,
+        max_samples=args.max_samples,
+        subset_mode=args.subset_mode
     )
 
     val_loader = get_val_dataloader(
@@ -117,7 +128,9 @@ def main(args):
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         img_size=args.img_size,
-        split='val'
+        datasets=datasets_list,
+        max_samples=args.max_samples // 5 if args.max_samples else None,  # val约为train的1/5
+        subset_mode=args.subset_mode
     )
 
     print(f"训练集: {len(train_loader.dataset)} 样本")
