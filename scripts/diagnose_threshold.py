@@ -19,7 +19,7 @@ def main():
     print("="*60)
 
     # 配置
-    checkpoint_path = "checkpoints/best_model.pth"
+    checkpoint_path = "checkpoints/full_run/best_model.pth"
     data_path = "data"
     batch_size = 64
 

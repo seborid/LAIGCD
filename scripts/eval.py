@@ -49,7 +49,7 @@ def main():
 
     # 加载模型
     print(f"加载模型: {args.checkpoint}")
-    checkpoint = torch.load(args.checkpoint, map_location='cpu')
+    checkpoint = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
 
     # 加载配置
     config_path = Path(args.checkpoint).parent / 'config.json'
@@ -73,13 +73,23 @@ def main():
     print(f"模型加载完成")
 
     # 创建数据加载器
-    dataloader = get_val_dataloader(
-        data_path=args.data_path,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        img_size=args.img_size,
-        split=args.split
-    )
+    # 注意：get_val_dataloader 内部使用 split='valid'，忽略传入的 split 参数
+    # 如果需要测试集，应该使用 get_test_dataloader
+    if args.split == 'test':
+        from utils.data import get_test_dataloader
+        dataloader = get_test_dataloader(
+            data_path=args.data_path,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            img_size=args.img_size
+        )
+    else:
+        dataloader = get_val_dataloader(
+            data_path=args.data_path,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            img_size=args.img_size
+        )
 
     print(f"评估集: {len(dataloader.dataset)} 样本")
 
@@ -89,7 +99,14 @@ def main():
     all_labels = []
     all_paths = []
 
-    for images, labels in dataloader:
+    for batch in dataloader:
+        # 处理字典格式的数据
+        if isinstance(batch, dict):
+            images = batch['image']
+            labels = batch['label']
+        else:
+            images, labels = batch
+
         images = images.to(device)
         labels = labels.to(device)
 

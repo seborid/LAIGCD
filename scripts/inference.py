@@ -39,7 +39,7 @@ def load_model(checkpoint_path, device='cuda'):
     print(f"加载模型: {checkpoint_path}")
 
     # 加载检查点
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
 
     # 加载配置
     config_path = Path(checkpoint_path).parent / 'config.json'
@@ -140,8 +140,8 @@ def predict_directory(model, image_dir, transform, device='cuda', output_path=No
 
 def main():
     parser = argparse.ArgumentParser('LAIGCD推理')
-    parser.add_argument('--checkpoint', type=str, required=True, help='模型检查点路径')
-    parser.add_argument('--image', type=str, help='单张图像路径')
+    parser.add_argument('image', type=str, nargs='?', help='单张图像路径')
+    parser.add_argument('--checkpoint', type=str, default='checkpoints/full_run/best_model.pth', help='模型检查点路径 (默认: checkpoints/full_run/best_model.pth)')
     parser.add_argument('--image_dir', type=str, help='图像目录路径')
     parser.add_argument('--output', type=str, help='输出结果文件路径')
     parser.add_argument('--img_size', type=int, default=224, help='输入图像大小')
@@ -191,7 +191,10 @@ def main():
 
     else:
         parser.print_help()
-        print("\n错误: 请指定 --image 或 --image_dir")
+        print("\n错误: 请指定图像路径")
+        print("\n用法示例:")
+        print("  python scripts/inference.py /path/to/image.jpg")
+        print("  python scripts/inference.py /path/to/image.jpg --checkpoint /path/to/model.pth")
 
 
 if __name__ == "__main__":
