@@ -1,111 +1,230 @@
-# LAIGCD: Lightweight AI-Generated Content Detector
+# LAIGCD: 基于空域语义分析和频域分析的轻量化、可解释性 AIGC 人脸检测系统
 
 ## 项目简介
 
-LAIGCD是一个轻量级的AI生成图像检测系统，旨在在小数据集（<100GB）和单卡（如4070Ti）条件下实现高效的深度伪造检测。
+LAIGCD 是一个面向 **AIGC / Deepfake 人脸检测** 的两阶段系统，目标是在较低训练成本下完成：
 
-## 核心特性
+- **第一阶段：真假判断**
+  - 输入人脸图像
+  - 输出真实 / 伪造分类结果
+- **第二阶段：多模态可解释性**
+  - 结合原图、空域热力图、频域响应图、原型激活等信息
+  - 生成可视化和自然语言解释
 
-- ✅ **轻量化**: 仅~800K可训练参数
-- ✅ **高效**: 4070Ti单卡6小时完成训练
-- ✅ **准确**: 多种生成器检测准确率>85%
-- ✅ **可解释**: 原型注意力可视化
-- ✅ **实用**: 支持批量推理和API部署
+当前仓库的主要实现集中在第一阶段，第二阶段已有设计文档，尚未形成完整可运行主链路。
 
-## 技术架构
+## 题目定义
 
+正式题目：
+
+**基于空域语义分析和频域分析的轻量化、可解释性 AIGC 人脸检测系统**
+
+关键词：
+
+- 空域语义分析
+- 频域分析
+- 轻量化
+- 可解释性
+- AIGC 人脸检测
+
+## 技术路线
+
+第一阶段的主干模型为：
+
+```text
+输入人脸图像
+  -> CLIP ViT-B/32 空域语义特征（冻结）
+  -> SRM 频域特征分支（可训练）
+  -> 特征融合
+  -> Prototype Module 原型学习分类头
+  -> 真 / 伪判断
 ```
-CLIP空域特征 (冻结) + 频域特征 (可训练) → 原型学习模块 → 二分类输出
+
+第二阶段的目标链路为：
+
+```text
+原图 + 空域热力图 + 频域热力图 + 原型激活
+  -> 多模态解释模块
+  -> 输出自然语言解释与可视化说明
 ```
 
-## 快速开始
+## 当前进展
 
-### 安装依赖
+### 已完成
+
+- 第一阶段检测模型实现
+- 双数据集加载与统一封装
+- 训练、验证、推理脚本
+- 日志、checkpoint、结果可视化
+- 原型注意力相关可解释性基础能力
+- 本地数据下载与多轮训练产物沉淀
+
+### 进行中
+
+- 验证阶段阈值校准
+- 排查 `AP` 高但 `Accuracy` 接近 `0.5` 的原因
+- 让第一阶段输出稳定服务于第二阶段解释模块
+
+### 未完成
+
+- 第二阶段多模态解释主链路
+- 自动化测试
+- API / Web 部署
+- ONNX / TensorRT / 量化优化
+- 完整消融实验与正式报告
+
+## 当前实验状态
+
+现有训练结果表明：
+
+- 小样本 `quick_run` 仅验证了训练链路可运行
+- `standard_run` 与 `full_run` 的 `AP` 已经很高
+- 但默认阈值下 `Accuracy` 仍异常接近 `0.5`
+
+这说明当前最优先的问题不是“模型完全没学到”，而是：
+
+- 决策阈值可能未校准
+- 概率分布可能整体偏移
+- 评估脚本或评估口径需要继续核查
+
+## 数据集
+
+当前实现主要使用两个 Kaggle 数据集：
+
+- `140k-real-and-fake-faces`
+- `130k-real-vs-fake-face`
+
+本项目不是强依赖统一的 `train/val/test` 简单目录，而是已经在 `utils/data.py` 中适配了这两套真实数据结构。
+
+数据下载脚本：
 
 ```bash
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-pip install open-clip-torch transformers pytorch-wavelets scikit-learn matplotlib tqdm
+python3 datadownload.py
 ```
 
-### 数据准备
+## 安装依赖
+
+建议使用 Python 3.10+。
 
 ```bash
-# 数据集结构
-data/
-├── train/
-│   ├── real/  # 真实图像
-│   └── fake/  # AI生成图像
-└── val/
-    ├── real/
-    └── fake/
+pip install -r requirements.txt
 ```
 
-### 训练
+如需单独安装 PyTorch，可根据 CUDA 版本自行选择官方源。
+
+## 训练
+
+标准训练入口：
 
 ```bash
-bash scripts/train.sh
+python3 scripts/train.py --data_path data --output_dir checkpoints/run1
 ```
 
-### 推理
+优化训练脚本：
 
 ```bash
-python inference.py --image_path test.jpg --checkpoint checkpoints/best.pth
+bash scripts/train_optimized.sh quick
+bash scripts/train_optimized.sh standard
+bash scripts/train_optimized.sh full
+```
+
+说明：
+
+- `quick`：快速验证代码和收敛趋势
+- `standard`：中规模实验
+- `full`：全量训练
+
+## 推理
+
+单图推理：
+
+```bash
+python3 scripts/inference.py \
+  --checkpoint checkpoints/full_run/best_model.pth \
+  --image path/to/image.jpg
+```
+
+目录批量推理：
+
+```bash
+python3 scripts/inference.py \
+  --checkpoint checkpoints/full_run/best_model.pth \
+  --image_dir path/to/images \
+  --output results.json
+```
+
+## 评估与诊断
+
+评估入口：
+
+```bash
+python3 scripts/eval.py --checkpoint checkpoints/full_run/best_model.pth --data_path data
+```
+
+阈值诊断：
+
+```bash
+python3 scripts/diagnose_threshold.py
+```
+
+结果可视化：
+
+```bash
+python3 scripts/visualize_results.py --checkpoint_dir checkpoints/full_run
 ```
 
 ## 项目结构
 
-```
+```text
 LAIGCD/
-├── PROJECT_PLAN.md          # 项目计划
-├── TECHNICAL_DESIGN.md      # 技术设计
-├── TODO.md                  # 实现检查清单
-├── models/                  # 模型定义
-│   ├── __init__.py
-│   ├── freq_module.py       # 频域特征模块
-│   ├── prototype.py         # 原型学习模块
-│   └── detector.py          # 完整检测器
-├── utils/                   # 工具函数
-│   ├── __init__.py
-│   ├── data.py              # 数据加载
-│   ├── train.py             # 训练函数
-│   ├── metrics.py           # 评估指标
-│   └── viz.py               # 可视化工具
-├── scripts/                 # 运行脚本
+├── README.md
+├── PROJECT_MEMORY.md
+├── PROJECT_PLAN.md
+├── TECHNICAL_DESIGN.md
+├── EXPLAINABILITY_DESIGN.md
+├── EXPLAINABILITY_ANALYSIS.md
+├── INNOVATION_IDEAS.md
+├── models/
+│   ├── detector.py
+│   ├── freq_module.py
+│   └── prototype.py
+├── utils/
+│   ├── data.py
+│   ├── train.py
+│   ├── metrics.py
+│   └── viz.py
+├── scripts/
+│   ├── train.py
 │   ├── train.sh
-│   ├── eval.sh
-│   └── inference.sh
-├── data/                    # 数据集目录
-├── checkpoints/             # 模型检查点
-└── results/                 # 实验结果
+│   ├── train_optimized.sh
+│   ├── eval.py
+│   ├── inference.py
+│   ├── diagnose_threshold.py
+│   └── visualize_results.py
+├── data/
+└── checkpoints/
 ```
-
-## 性能指标
-
-| 指标 | 目标值 |
-|------|--------|
-| 可训练参数 | ~800K |
-| 显存占用 | ~4GB (训练) |
-| 训练时间 | ~6小时 (4070Ti) |
-| 推理速度 | ~50 FPS |
-| 检测准确率 | >85% |
 
 ## 文档导航
 
-1. **[PROJECT_PLAN.md](PROJECT_PLAN.md)** - 项目计划与路线图
-2. **[TECHNICAL_DESIGN.md](TECHNICAL_DESIGN.md)** - 详细技术设计
-3. **[TODO.md](TODO.md)** - 实现检查清单
+- [PROJECT_MEMORY.md](PROJECT_MEMORY.md)：项目路线、现状与持久化记忆
+- [PROJECT_PLAN.md](PROJECT_PLAN.md)：项目总体规划
+- [TECHNICAL_DESIGN.md](TECHNICAL_DESIGN.md)：第一阶段技术设计
+- [EXPLAINABILITY_DESIGN.md](EXPLAINABILITY_DESIGN.md)：第二阶段可解释性方案
+- [EXPLAINABILITY_ANALYSIS.md](EXPLAINABILITY_ANALYSIS.md)：可解释性扩展分析
+- [TODO.md](TODO.md)：原始实现清单
 
-## 核心设计思想
+## 核心参考
 
-本项目借鉴了以下两个优秀开源项目的核心思想：
+- GAPL：原型学习与交叉注意力思路
+- 图像取证中的 SRM 高频滤波思路
+- CLIP 视觉语义特征作为冻结空域 backbone
 
-- **[GAPL](https://github.com/AbyssLumine/GAPL)**: 原型学习 + 交叉注意力机制
-- **[IAPL](https://github.com/xxx/IAPL)**: 频域特征分析 + DCT条件模块
+## 当前注意事项
 
-## 致谢
-
-- CLIP模型来自 [OpenAI](https://openai.com/research/clip)
-- 预训练权重来自 [LAION](https://laion.ai/blog/laion-5b/)
+- `README` 描述的是项目的正式目标与当前真实进展，不代表第二阶段已经完成
+- 当前第一阶段结果的主要问题集中在阈值和评估判读，而不是训练链路缺失
+- 若要了解最新状态，优先参考 `PROJECT_MEMORY.md`
 
 ## License
 
