@@ -137,31 +137,56 @@ def format_metrics_table(all_metrics):
     return "\n".join(lines)
 
 
-def get_optimal_threshold(labels, probs):
+def get_optimal_threshold(labels, probs, metric='f1'):
     """
-    找到最优阈值（最大化F1）
+    找到最优阈值（可按F1或Accuracy优化）
 
     Args:
         labels: 真实标签
         probs: 预测概率
+        metric: 'f1' 或 'accuracy'
 
     Returns:
         optimal_threshold: 最优阈值
+        best_score: 该阈值下的最优分数
+        metrics_at_threshold: 阈值下的完整指标字典
     """
-    from sklearn.metrics import f1_score
+    from sklearn.metrics import f1_score, accuracy_score
 
     best_threshold = 0.5
-    best_f1 = 0
+    best_score = 0
 
-    for threshold in np.arange(0.1, 0.9, 0.05):
+    # 粗搜索
+    for threshold in np.arange(0.05, 0.95, 0.05):
         preds = (probs >= threshold).astype(int)
-        f1 = f1_score(labels, preds, zero_division=0)
+        if metric == 'f1':
+            score = f1_score(labels, preds, zero_division=0)
+        else:
+            score = accuracy_score(labels, preds)
 
-        if f1 > best_f1:
-            best_f1 = f1
+        if score > best_score:
+            best_score = score
             best_threshold = threshold
 
-    return best_threshold
+    # 在最优阈值附近精细搜索
+    for threshold in np.arange(max(0.01, best_threshold - 0.05),
+                               min(0.99, best_threshold + 0.05), 0.01):
+        preds = (probs >= threshold).astype(int)
+        if metric == 'f1':
+            score = f1_score(labels, preds, zero_division=0)
+        else:
+            score = accuracy_score(labels, preds)
+
+        if score > best_score:
+            best_score = score
+            best_threshold = threshold
+
+    # 计算该阈值下的完整指标
+    preds = (probs >= best_threshold).astype(int)
+    metrics_at_threshold = compute_metrics(labels, probs, threshold=best_threshold)
+    metrics_at_threshold['best_f1'] = best_score if metric == 'f1' else None
+
+    return best_threshold, best_score, metrics_at_threshold
 
 
 def test_metrics():

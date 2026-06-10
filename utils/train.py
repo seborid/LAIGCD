@@ -168,7 +168,7 @@ def train_one_epoch(
 
 
 @torch.no_grad()
-def validate(model, dataloader, device, logger=None):
+def validate(model, dataloader, device, logger=None, find_optimal_threshold=False):
     """
     验证/测试
 
@@ -177,6 +177,7 @@ def validate(model, dataloader, device, logger=None):
         dataloader: 数据加载器
         device: 设备
         logger: 日志记录器（可选）
+        find_optimal_threshold: 是否搜索最优阈值
 
     Returns:
         metrics: 指标字典
@@ -213,10 +214,10 @@ def validate(model, dataloader, device, logger=None):
 
     # 计算指标
     probs = torch.sigmoid(all_logits).numpy()
-    preds = (probs > 0.5).astype(int)
     labels_np = all_labels.numpy()
 
-    # 基础指标
+    # 默认阈值0.5的指标
+    preds = (probs > 0.5).astype(int)
     accuracy = (preds == labels_np).mean()
 
     # 计算AP
@@ -229,10 +230,11 @@ def validate(model, dataloader, device, logger=None):
         'ap': ap,
         'predictions': preds,
         'probabilities': probs,
-        'labels': labels_np
+        'labels': labels_np,
+        'threshold': 0.5
     }
 
-    # 详细指标
+    # 详细指标（阈值0.5）
     if len(np.unique(labels_np)) > 1:
         from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 
@@ -245,6 +247,20 @@ def validate(model, dataloader, device, logger=None):
             })
         except:
             pass
+
+        # 搜索最优阈值（如果需要）
+        if find_optimal_threshold:
+            from utils.metrics import get_optimal_threshold
+            opt_threshold, opt_score, opt_metrics = get_optimal_threshold(
+                labels_np, probs, metric='f1'
+            )
+
+            metrics['optimal_threshold'] = opt_threshold
+            metrics['optimal_accuracy'] = opt_metrics['accuracy']
+            metrics['optimal_f1'] = opt_score
+
+            if logger:
+                logger.info(f"  最优阈值: {opt_threshold:.3f} → Accuracy: {opt_metrics['accuracy']:.4f}, F1: {opt_score:.4f}")
 
     return metrics
 
