@@ -94,6 +94,60 @@ class LightweightAIGCDetector(nn.Module):
         # 损失函数
         self.criterion = nn.BCEWithLogitsLoss()
 
+    @staticmethod
+    def _normalize_heatmap(heatmap):
+        """将热力图逐样本归一化到[0, 1]。"""
+        flat = heatmap.flatten(1)
+        min_vals = flat.min(dim=1, keepdim=True).values.view(-1, 1, 1)
+        max_vals = flat.max(dim=1, keepdim=True).values.view(-1, 1, 1)
+        return (heatmap - min_vals) / (max_vals - min_vals + 1e-6)
+
+    def extract_clip_features(self, x, enable_grad=False):
+        """
+        提取CLIP特征。
+
+        Args:
+            x: [B, 3, H, W] 输入图像
+            enable_grad: 是否保留梯度用于解释
+
+        Returns:
+            [B, clip_dim] CLIP全局特征
+        """
+        if enable_grad:
+            clip_features = self.clip.visual(x)
+        else:
+            with torch.no_grad():
+                clip_features = self.clip.visual(x)
+
+        if clip_features.dim() == 3:
+            clip_features = clip_features.mean(dim=1)
+
+        return clip_features
+
+    def extract_features(self, x, enable_clip_grad=False):
+        """
+        提取融合特征。
+
+        Args:
+            x: [B, 3, H, W] 输入图像
+            enable_clip_grad: 是否保留CLIP梯度
+
+        Returns:
+            features: [B, D] 融合特征
+            clip_features: [B, clip_dim]
+            freq_features: [B, freq_dim] 或 None
+        """
+        clip_features = self.extract_clip_features(x, enable_grad=enable_clip_grad)
+
+        freq_features = None
+        if self.use_freq:
+            freq_features = self.freq_module(x)
+            features = torch.cat([clip_features, freq_features], dim=1)
+        else:
+            features = clip_features
+
+        return features, clip_features, freq_features
+
     def forward(self, x, return_attn=False):
         """
         前向传播
@@ -106,20 +160,7 @@ class LightweightAIGCDetector(nn.Module):
             logits: [B, 1] 分类logits
             attn_weights: [B, num_prototypes] 注意力权重（可选）
         """
-        # CLIP特征提取（不计算梯度）
-        with torch.no_grad():
-            clip_features = self.clip.visual(x)  # [B, clip_dim]
-
-            # 确保是全局特征（如果是patch tokens，做平均池化）
-            if clip_features.dim() == 3:
-                clip_features = clip_features.mean(dim=1)
-
-        # 频域特征
-        if self.use_freq:
-            freq_features = self.freq_module(x)  # [B, freq_dim]
-            features = torch.cat([clip_features, freq_features], dim=1)  # [B, input_dim]
-        else:
-            features = clip_features
+        features, _, _ = self.extract_features(x, enable_clip_grad=False)
 
         # 分类
         if isinstance(self.classifier, PrototypeModule):
@@ -161,6 +202,70 @@ class LightweightAIGCDetector(nn.Module):
             return attn_weights
         else:
             raise NotImplementedError("简单分类器不支持注意力权重")
+
+    def explain(self, x):
+        """
+        生成预测及空域/频域热力图。
+
+        Args:
+            x: [B, 3, H, W] 输入图像
+
+        Returns:
+            dict:
+                logits: [B, 1]
+                probabilities: [B]
+                predictions: [B]
+                prototype_attention: [B, P] 或 None
+                spatial_heatmap: [B, H, W]
+                frequency_heatmap: [B, H, W] 或 None
+        """
+        self.eval()
+
+        input_tensor = x.detach().clone()
+        input_tensor.requires_grad_(True)
+
+        features, _, _ = self.extract_features(input_tensor, enable_clip_grad=True)
+
+        if isinstance(self.classifier, PrototypeModule):
+            logits, attn_weights = self.classifier(features, return_attn=True)
+        else:
+            logits = self.classifier(features)
+            attn_weights = None
+
+        probs = torch.sigmoid(logits).squeeze(1)
+        preds = (probs > 0.5).long()
+
+        target = logits.sum()
+        grads = torch.autograd.grad(
+            outputs=target,
+            inputs=input_tensor,
+            retain_graph=False,
+            create_graph=False,
+            allow_unused=False
+        )[0]
+
+        spatial_heatmap = grads.abs().mean(dim=1)
+        spatial_heatmap = self._normalize_heatmap(spatial_heatmap)
+
+        if attn_weights is not None:
+            topk = min(3, attn_weights.shape[1])
+            gate = torch.topk(attn_weights, k=topk, dim=1).values.mean(dim=1)
+            spatial_heatmap = spatial_heatmap * gate.view(-1, 1, 1)
+            spatial_heatmap = self._normalize_heatmap(spatial_heatmap)
+
+        frequency_heatmap = None
+        if self.use_freq and hasattr(self.freq_module, 'get_frequency_heatmap'):
+            with torch.no_grad():
+                frequency_heatmap = self.freq_module.get_frequency_heatmap(x.detach())
+
+        return {
+            'logits': logits.detach(),
+            'probabilities': probs.detach(),
+            'predictions': preds.detach(),
+            'prototype_attention': attn_weights.detach() if attn_weights is not None else None,
+            'spatial_heatmap': spatial_heatmap.detach(),
+            'frequency_heatmap': frequency_heatmap.detach() if frequency_heatmap is not None else None
+        }
 
     def get_prototypes(self):
         """获取原型向量"""

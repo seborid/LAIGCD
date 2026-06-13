@@ -11,7 +11,7 @@ LAIGCD 是一个面向 **AIGC / Deepfake 人脸检测** 的两阶段系统，目
   - 结合原图、空域热力图、频域响应图、原型激活等信息
   - 生成可视化和自然语言解释
 
-当前仓库的主要实现集中在第一阶段，第二阶段已有设计文档，尚未形成完整可运行主链路。
+当前仓库已完成第一阶段的训练、评估与推理闭环；第二阶段已有设计文档，但尚未形成完整可运行主链路。
 
 ## 题目定义
 
@@ -54,20 +54,21 @@ LAIGCD 是一个面向 **AIGC / Deepfake 人脸检测** 的两阶段系统，目
 
 - 第一阶段检测模型实现
 - 双数据集加载与统一封装
-- 训练、验证、推理脚本
+- 训练、验证、测试、推理脚本
 - 日志、checkpoint、结果可视化
-- 原型注意力相关可解释性基础能力
-- 本地数据下载与多轮训练产物沉淀
+- 多轮真实训练产物沉淀（`quick_run` / `standard_run` / `full_run`）
+- 第一阶段测试集评估与评估报告
 
 ### 进行中
 
-- 验证阶段阈值校准
-- 排查 `AP` 高但 `Accuracy` 接近 `0.5` 的原因
-- 让第一阶段输出稳定服务于第二阶段解释模块
+- 第二阶段最小可演示链路设计与实现
+- 原型注意力、空域热力图、频域热力图能力补全
+- 答辩演示材料与展示流程整理
 
 ### 未完成
 
 - 第二阶段多模态解释主链路
+- FakeVLM/自然语言解释集成
 - 自动化测试
 - API / Web 部署
 - ONNX / TensorRT / 量化优化
@@ -75,17 +76,15 @@ LAIGCD 是一个面向 **AIGC / Deepfake 人脸检测** 的两阶段系统，目
 
 ## 当前实验状态
 
-现有训练结果表明：
+当前第一阶段实验结论已经明确：
 
-- 小样本 `quick_run` 仅验证了训练链路可运行
-- `standard_run` 与 `full_run` 的 `AP` 已经很高
-- 但默认阈值下 `Accuracy` 仍异常接近 `0.5`
+- `quick_run`：用于快速验证训练链路可运行
+- `standard_run`：用于中规模实验和收敛趋势确认
+- `full_run`：已完成 30 轮训练，并产出当前最佳模型
+- 测试集评估结果：`Accuracy 99.13%`，`AP 0.9996`，`AUC 0.9996`
+- 验证集阈值诊断结果：默认阈值 `0.5` 已可用，推荐阈值约 `0.68`
 
-这说明当前最优先的问题不是“模型完全没学到”，而是：
-
-- 决策阈值可能未校准
-- 概率分布可能整体偏移
-- 评估脚本或评估口径需要继续核查
+结论：第一阶段已经达到“可训练、可评估、可推理、可展示”的状态，下一步重点应转向第二阶段可解释性落地。
 
 ## 数据集
 
@@ -96,11 +95,11 @@ LAIGCD 是一个面向 **AIGC / Deepfake 人脸检测** 的两阶段系统，目
 
 本项目不是强依赖统一的 `train/val/test` 简单目录，而是已经在 `utils/data.py` 中适配了这两套真实数据结构。
 
-数据下载脚本：
+说明：
 
-```bash
-python3 datadownload.py
-```
+- 当前仓库未包含自动下载脚本
+- 请手动将数据集放置在 `data/` 目录下
+- `utils/data.py` 会直接适配这两套数据集的实际目录结构
 
 ## 安装依赖
 
@@ -139,9 +138,8 @@ bash scripts/train_optimized.sh full
 单图推理：
 
 ```bash
-python3 scripts/inference.py \
-  --checkpoint checkpoints/full_run/best_model.pth \
-  --image path/to/image.jpg
+python3 scripts/inference.py path/to/image.jpg \
+  --checkpoint checkpoints/full_run/best_model.pth
 ```
 
 目录批量推理：
@@ -158,7 +156,10 @@ python3 scripts/inference.py \
 评估入口：
 
 ```bash
-python3 scripts/eval.py --checkpoint checkpoints/full_run/best_model.pth --data_path data
+python3 scripts/eval.py \
+  --checkpoint checkpoints/full_run/best_model.pth \
+  --data_path data \
+  --split test
 ```
 
 阈值诊断：
@@ -178,12 +179,14 @@ python3 scripts/visualize_results.py --checkpoint_dir checkpoints/full_run
 ```text
 LAIGCD/
 ├── README.md
-├── PROJECT_MEMORY.md
-├── PROJECT_PLAN.md
-├── TECHNICAL_DESIGN.md
-├── EXPLAINABILITY_DESIGN.md
-├── EXPLAINABILITY_ANALYSIS.md
-├── INNOVATION_IDEAS.md
+├── docs/
+│   ├── PROJECT_MEMORY.md
+│   ├── PROJECT_PLAN.md
+│   ├── TECHNICAL_DESIGN.md
+│   ├── EXPLAINABILITY_DESIGN.md
+│   ├── EXPLAINABILITY_ANALYSIS.md
+│   ├── ASSETS_EVALUATION_REPORT.md
+│   └── TODO.md
 ├── models/
 │   ├── detector.py
 │   ├── freq_module.py
@@ -207,12 +210,13 @@ LAIGCD/
 
 ## 文档导航
 
-- [PROJECT_MEMORY.md](PROJECT_MEMORY.md)：项目路线、现状与持久化记忆
-- [PROJECT_PLAN.md](PROJECT_PLAN.md)：项目总体规划
-- [TECHNICAL_DESIGN.md](TECHNICAL_DESIGN.md)：第一阶段技术设计
-- [EXPLAINABILITY_DESIGN.md](EXPLAINABILITY_DESIGN.md)：第二阶段可解释性方案
-- [EXPLAINABILITY_ANALYSIS.md](EXPLAINABILITY_ANALYSIS.md)：可解释性扩展分析
-- [TODO.md](TODO.md)：原始实现清单
+- [docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md)：项目路线、现状与持久化记忆
+- [docs/ASSETS_EVALUATION_REPORT.md](docs/ASSETS_EVALUATION_REPORT.md)：第一阶段测试评估结果
+- [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md)：项目早期总体规划
+- [docs/TECHNICAL_DESIGN.md](docs/TECHNICAL_DESIGN.md)：第一阶段技术设计
+- [docs/EXPLAINABILITY_DESIGN.md](docs/EXPLAINABILITY_DESIGN.md)：第二阶段可解释性方案
+- [docs/EXPLAINABILITY_ANALYSIS.md](docs/EXPLAINABILITY_ANALYSIS.md)：可解释性扩展分析
+- [docs/TODO.md](docs/TODO.md)：当前任务清单
 
 ## 核心参考
 
@@ -222,9 +226,10 @@ LAIGCD/
 
 ## 当前注意事项
 
-- `README` 描述的是项目的正式目标与当前真实进展，不代表第二阶段已经完成
-- 当前第一阶段结果的主要问题集中在阈值和评估判读，而不是训练链路缺失
-- 若要了解最新状态，优先参考 `PROJECT_MEMORY.md`
+- `README` 描述的是当前仓库的真实进展，不代表第二阶段已经完成
+- 当前第一阶段已完成训练和测试评估，第二阶段仍处于设计到落地过渡阶段
+- 若要查看最新实验状态，优先参考 `docs/PROJECT_MEMORY.md` 与 `docs/ASSETS_EVALUATION_REPORT.md`
+- `docs/PROJECT_PLAN.md` 与部分设计文档保留了早期规划内容，不应视为最新进度结论
 
 ## License
 

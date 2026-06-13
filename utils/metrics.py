@@ -27,9 +27,9 @@ def compute_metrics(labels, probs, threshold=0.5):
     Returns:
         metrics: 指标字典
     """
-    preds = (probs > threshold).astype(int)
     labels = np.array(labels)
     probs = np.array(probs)
+    preds = (probs >= threshold).astype(int)
 
     metrics = {
         'accuracy': accuracy_score(labels, preds),
@@ -72,15 +72,19 @@ def compute_per_generator_metrics(labels, probs, generator_names, threshold=0.5)
     Returns:
         per_gen_metrics: 每个生成器的指标
     """
+    labels = np.array(labels)
+    probs = np.array(probs)
+    generator_names = np.array(generator_names)
+
     per_gen_metrics = {}
 
     for gen in set(generator_names):
-        mask = np.array(generator_names) == gen
-        gen_labels = np.array(labels)[mask]
+        mask = generator_names == gen
+        gen_labels = labels[mask]
         gen_probs = probs[mask]
 
         if len(gen_labels) > 0:
-            gen_preds = (gen_probs > threshold).astype(int)
+            gen_preds = (gen_probs >= threshold).astype(int)
             per_gen_metrics[gen] = {
                 'accuracy': accuracy_score(gen_labels, gen_preds),
                 'ap': average_precision_score(gen_labels, gen_probs) if len(np.unique(gen_labels)) > 1 else 0.0,
@@ -152,6 +156,9 @@ def get_optimal_threshold(labels, probs, metric='f1'):
         metrics_at_threshold: 阈值下的完整指标字典
     """
     from sklearn.metrics import f1_score, accuracy_score
+
+    labels = np.array(labels)
+    probs = np.array(probs)
 
     best_threshold = 0.5
     best_score = 0

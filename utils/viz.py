@@ -7,6 +7,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc, confusion_matrix
 import seaborn as sns
+from pathlib import Path
+from PIL import Image
+
+
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
 def plot_confusion_matrix(cm, class_names, save_path=None):
@@ -40,6 +46,120 @@ def plot_confusion_matrix(cm, class_names, save_path=None):
         plt.show()
 
     plt.close()
+
+
+def denormalize_image(image_tensor):
+    """
+    将归一化后的图像张量转回[0, 1]图像。
+
+    Args:
+        image_tensor: [C, H, W] 或 [1, C, H, W]
+
+    Returns:
+        [H, W, 3] numpy数组
+    """
+    if image_tensor.dim() == 4:
+        image_tensor = image_tensor[0]
+
+    img_np = image_tensor.detach().cpu().permute(1, 2, 0).numpy()
+    img_np = img_np * IMAGENET_STD + IMAGENET_MEAN
+    return np.clip(img_np, 0, 1)
+
+
+def tensor_to_heatmap(heatmap_tensor):
+    """
+    将热力图张量转为[0, 1] numpy数组。
+
+    Args:
+        heatmap_tensor: [H, W] 或 [1, H, W] 或 [B, H, W]
+
+    Returns:
+        [H, W] numpy数组
+    """
+    if isinstance(heatmap_tensor, torch.Tensor):
+        if heatmap_tensor.dim() == 3:
+            heatmap_tensor = heatmap_tensor[0]
+        heatmap = heatmap_tensor.detach().cpu().numpy()
+    else:
+        heatmap = np.asarray(heatmap_tensor)
+
+    heatmap = heatmap.astype(np.float32)
+    min_val = float(heatmap.min())
+    max_val = float(heatmap.max())
+    if max_val - min_val < 1e-6:
+        return np.zeros_like(heatmap)
+    return (heatmap - min_val) / (max_val - min_val)
+
+
+def create_overlay(image, heatmap, cmap='jet', alpha=0.45):
+    """
+    生成原图与热力图叠加图。
+
+    Args:
+        image: [H, W, 3] numpy图像
+        heatmap: [H, W] numpy热力图
+        cmap: matplotlib色图
+        alpha: 热力图透明度
+
+    Returns:
+        [H, W, 3] numpy数组
+    """
+    heatmap = np.clip(heatmap, 0, 1)
+    colored = plt.get_cmap(cmap)(heatmap)[..., :3]
+    overlay = (1 - alpha) * image + alpha * colored
+    return np.clip(overlay, 0, 1)
+
+
+def save_rgb_image(image_np, save_path):
+    """保存RGB图像。"""
+    save_path = Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    img = (np.clip(image_np, 0, 1) * 255).astype(np.uint8)
+    Image.fromarray(img).save(save_path)
+
+
+def save_heatmap_image(heatmap_np, save_path, cmap='jet'):
+    """保存热力图图像。"""
+    save_path = Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.imshow(heatmap_np, cmap=cmap, vmin=0, vmax=1)
+    ax.axis('off')
+    plt.tight_layout(pad=0)
+    plt.savefig(save_path, dpi=150, bbox_inches='tight', pad_inches=0)
+    plt.close(fig)
+
+
+def summarize_peaks(heatmap_np, top_k=3):
+    """
+    提取热力图的top-k峰值位置。
+
+    Args:
+        heatmap_np: [H, W] numpy热力图
+        top_k: 峰值个数
+
+    Returns:
+        [{'x': int, 'y': int, 'score': float}, ...]
+    """
+    flat = heatmap_np.reshape(-1)
+    top_k = min(top_k, flat.size)
+    if top_k == 0:
+        return []
+
+    indices = np.argpartition(flat, -top_k)[-top_k:]
+    indices = indices[np.argsort(flat[indices])[::-1]]
+    width = heatmap_np.shape[1]
+
+    peaks = []
+    for idx in indices:
+        y, x = divmod(int(idx), width)
+        peaks.append({
+            'x': int(x),
+            'y': int(y),
+            'score': float(flat[idx])
+        })
+    return peaks
 
 
 def plot_roc_curve(labels, probs, save_path=None):

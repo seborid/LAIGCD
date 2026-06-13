@@ -34,7 +34,13 @@ from .viz import (
     plot_roc_curve,
     visualize_prototype_attention,
     plot_training_curves,
-    plot_prototypes_embeddings
+    plot_prototypes_embeddings,
+    denormalize_image,
+    tensor_to_heatmap,
+    create_overlay,
+    save_rgb_image,
+    save_heatmap_image,
+    summarize_peaks
 )
 
 __all__ = [
@@ -68,4 +74,10 @@ __all__ = [
     'visualize_prototype_attention',
     'plot_training_curves',
     'plot_prototypes_embeddings',
+    'denormalize_image',
+    'tensor_to_heatmap',
+    'create_overlay',
+    'save_rgb_image',
+    'save_heatmap_image',
+    'summarize_peaks',
 ]

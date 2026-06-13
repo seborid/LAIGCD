@@ -1,274 +1,118 @@
-# LAIGCD 实现检查清单
+# LAIGCD 当前任务清单
 
-## 阶段0：环境准备（预计 0.5天）
+更新日期：2026-06-13
 
-### 目录结构创建
-- [ ] 创建 `models/` 目录
-- [ ] 创建 `utils/` 目录
-- [ ] 创建 `scripts/` 目录
-- [ ] 创建 `checkpoints/` 目录
-- [ ] 创建 `results/` 目录
+## 说明
 
-### 依赖安装
-- [ ] 安装 PyTorch (CUDA 11.8)
-- [ ] 安装 open-clip-torch
-- [ ] 安装 transformers
-- [ ] 安装 pytorch-wavelets
-- [ ] 安装其他依赖 (scikit-learn, matplotlib, tqdm)
+本文件用于记录当前真实进度和下一步任务，已经替代早期"从零实现"式清单。
 
-### 数据准备
-- [ ] 创建 `data/train/real/` 目录
-- [ ] 创建 `data/train/fake/` 目录
-- [ ] 创建 `data/val/real/` 目录
-- [ ] 创建 `data/val/fake/` 目录
-- [ ] 下载/准备真实图像数据 (ImageNet/COCO子集)
-- [ ] 下载/准备AI生成图像数据 (GenImage等)
-- [ ] 验证数据集结构正确
+- 当前状态以 `README.md` 和 `docs/PROJECT_MEMORY.md` 为准
+- 早期规划与设计细节见 `docs/PROJECT_PLAN.md`
 
----
+## 当前结论
 
-## 阶段1：核心模块实现（预计 1天）
+- 第一阶段真伪检测器已经完成训练、评估、推理闭环
+- 当前最佳模型为 `checkpoints/full_run/best_model.pth`
+- 第一阶段测试集结果：`Accuracy 99.13%`，`AP 0.9996`，`AUC 0.9996`
+- 第二阶段多模态可解释性框架已完成，包括热力图生成和FakeVLM自然语言解释
 
-### 频域模块 (models/freq_module.py)
-- [ ] 实现 `SRMConv` 类（30个高通滤波器）
-  - [ ] 定义滤波器权重
-  - [ ] 创建卷积层并固定权重
-- [ ] 实现 `FreqEncoder` 类
-  - [ ] 三阶段卷积编码器
-  - [ ] 全局池化和投影层
-- [ ] 测试前向传播
-- [ ] 验证输出维度正确 [B, 128]
+## 已完成
 
-### 原型模块 (models/prototype.py)
-- [ ] 实现 `PrototypeModule` 类
-  - [ ] 初始化原型向量参数
-  - [ ] 实现交叉注意力机制
-  - [ ] 实现残差连接和层归一化
-  - [ ] 实现前馈网络
-  - [ ] 实现分类头
-- [ ] 测试前向传播
-- [ ] 验证注意力权重输出正确
-- [ ] 可视化原型注意力（可选）
+### 第一阶段：检测器
+- [x] 核心模型实现：`CLIP ViT-B/32` + `SRM` + `PrototypeModule`
+- [x] 双数据集适配：`140k-real-and-fake-faces`、`130k-real-vs-fake-face`
+- [x] 训练入口：`scripts/train.py`、`scripts/train_optimized.sh`
+- [x] 推理入口：`scripts/inference.py`
+- [x] 评估入口：`scripts/eval.py`
+- [x] 阈值诊断：`scripts/diagnose_threshold.py`
+- [x] 训练结果可视化：`scripts/visualize_results.py`
+- [x] 多轮训练产物沉淀：`quick_run`、`standard_run`、`full_run`
+- [x] 第一阶段测试集评估与评估报告
 
-### 完整检测器 (models/detector.py)
-- [ ] 实现 `LightweightAIGCDetector` 类
-  - [ ] 加载CLIP模型 (ViT-B/32)
-  - [ ] 冻结CLIP参数
-  - [ ] 集成频域模块
-  - [ ] 集成原型模块
-  - [ ] 实现前向传播逻辑
-  - [ ] 实现损失函数
-- [ ] 测试完整模型
-- [ ] 计算可训练参数数量
-- [ ] 估算显存占用
+### 第二阶段：可解释性
+- [x] 空域热力图生成功能
+- [x] 频域热力图生成功能
+- [x] 原型注意力可视化
+- [x] 解释脚本：`scripts/explain.py`
+- [x] **FakeVLM解释器模块**：`models/fakevlm_explainer.py`
+- [x] **自然语言解释脚本**：`scripts/nl_explain.py`
+- [x] **配置管理模块**：`configs/fakevlm_config.py`
+- [x] explain.py集成FakeVLM自然语言解释功能
 
-### 模型初始化文件 (models/__init__.py)
-- [ ] 导出所有模型类
-- [ ] 实现 `build_model()` 工厂函数
+## 进行中
 
----
+- [ ] FakeVLM模型下载和测试验证
+- [ ] 准备答辩展示案例和演示流程
 
-## 阶段2：数据加载器（预计 0.5天）
+## 未完成
 
-### 数据集类 (utils/data.py)
-- [ ] 实现 `AIGCDataset` 类
-  - [ ] 支持文件夹结构读取
-  - [ ] 实现数据增强
-  - [ ] 实现标签生成 (0=real, 1=fake)
-- [ ] 实现 `get_train_dataloader()` 函数
-- [ ] 实现 `get_val_dataloader()` 函数
-- [ ] 测试数据加载器
-- [ ] 验证批次形状正确
+- [ ] Web演示界面
+- [ ] API/部署
+- [ ] 自动化测试
+- [ ] 完整消融实验
+- [ ] ONNX/TensorRT/量化优化
 
-### 数据增强
-- [ ] 实现基础增强函数
-  - [ ] Resize + RandomCrop
-  - [ ] RandomHorizontalFlip
-  - [ ] ColorJitter
-- [ ] 实现验证增强函数
-  - [ ] Resize + CenterCrop
-- [ ] （可选）实现高级增强
-  - [ ] GaussianBlur
-  - [ ] RandomAdjustSharpness
-  - [ ] JPEG压缩模拟
+## 下一步优先级
 
----
+### P0 - 答辩准备
 
-## 阶段3：训练流程（预计 1天）
+- [ ] 验证FakeVLM集成功能（下载模型并测试）
+- [ ] 准备3-5个典型案例的完整解释输出
+- [ ] 整理答辩演示流程
 
-### 训练函数 (utils/train.py)
-- [ ] 实现 `train_one_epoch()` 函数
-  - [ ] 前向传播（混合精度）
-  - [ ] 损失计算
-  - [ ] 反向传播
-  - [ ] 梯度累积
-  - [ ] 梯度裁剪
-  - [ ] 参数更新
-  - [ ] EMA更新
-  - [ ] 日志记录
-- [ ] 实现 `validate()` 函数
-  - [ ] 批量推理
-  - [ ] 指标计算
-  - [ ] 返回详细结果
+### P1 - 功能完善
 
-### 评估指标 (utils/metrics.py)
-- [ ] 实现 `compute_metrics()` 函数
-  - [ ] Accuracy
-  - [ ] Precision/Recall
-  - [ ] F1-Score
-  - [ ] Average Precision
-  - [ ] AUC-ROC
-  - [ ] 混淆矩阵
-- [ ] 实现 `compute_per_generator_metrics()` 函数
-- [ ] 实现 `print_metrics()` 函数
+- [ ] 优化热力图可视化效果
+- [ ] 调整自然语言解释prompt以获得更好的解释质量
 
-### 可视化工具 (utils/viz.py)
-- [ ] 实现 `plot_confusion_matrix()` 函数
-- [ ] 实现 `plot_roc_curve()` 函数
-- [ ] 实现 `visualize_prototype_attention()` 函数
-- [ ] 实现 `plot_training_curves()` 函数
+### P2 - 扩展功能
 
-### 训练脚本 (scripts/train.py)
-- [ ] 实现参数解析
-- [ ] 实现模型初始化
-- [ ] 实现优化器和调度器设置
-- [ ] 实现训练循环
-  - [ ] Epoch循环
-  - [ ] 定期验证
-  - [ ] 保存最佳模型
-  - [ ] 早停机制
-- [ ] 实现日志记录
-- [ ] 实现检查点保存/恢复
+- [ ] 构建简易Web界面
+- [ ] 添加更多预设配置
 
-### 训练Shell脚本 (scripts/train.sh)
-- [ ] 设置环境变量
-- [ ] 配置训练参数
-- [ ] 调用训练脚本
-- [ ] 设置输出目录
+## FakeVLM 集成说明
 
----
+### 新增文件
 
-## 阶段4：实验与调优（预计 2天）
+- `models/fakevlm_explainer.py` - FakeVLM解释器核心模块
+- `scripts/nl_explain.py` - 独立的自然语言解释脚本
+- `configs/fakevlm_config.py` - 配置管理
 
-### 基线实验
-- [ ] 训练基线模型（配置1）
-- [ ] 记录训练曲线
-- [ ] 评估验证集性能
-- [ ] 评估测试集性能
-- [ ] 保存实验日志
+### 使用方法
 
-### 超参数搜索
-- [ ] 调整原型数量 (8/16/32)
-- [ ] 调整学习率 (5e-5 / 1e-4 / 2e-4)
-- [ ] 调整dropout (0.1 / 0.2 / 0.3)
-- [ ] 调整batch_size (8/16/32)
-- [ ] 记录所有实验结果
+1. **单图解释（含自然语言）**：
+```bash
+python scripts/explain.py image.jpg --use_fakevlm
+```
 
-### 消融实验
-- [ ] 不使用频域模块
-- [ ] 不使用原型学习（直接MLP）
-- [ ] 不同CLIP骨干 (ViT-B/16, ViT-L/14)
-- [ ] 不同频域方法 (SRM/DCT/FFT)
-- [ ] 分析各组件贡献
+2. **仅生成自然语言解释**：
+```bash
+python scripts/nl_explain.py image.jpg
+python scripts/nl_explain.py image.jpg --spatial spatial.png --frequency freq.png
+```
 
-### 错误分析
-- [ ] 分析误判样本
-- [ ] 按生成器统计准确率
-- [ ] 可视化困难样本
-- [ ] 分析原型注意力模式
+3. **使用8bit量化（节省显存）**：
+```bash
+python scripts/nl_explain.py image.jpg --load_in_8bit
+```
 
----
+4. **批量处理**：
+```bash
+python scripts/nl_explain.py --image_dir images/
+```
 
-## 阶段5：评估与部署（预计 0.5天）
+### 依赖说明
 
-### 测试集评估
-- [ ] 在完整测试集上评估
-- [ ] 计算所有指标
-- [ ] 生成评估报告
-- [ ] 绘制ROC曲线
+FakeVLM需要以下依赖（可选）：
+- `transformers>=4.45.0`
+- `flash-attn>=2.0.0` (可选，用于加速)
+- `bitsandbytes>=0.41.0` (可选，用于8bit量化)
 
-### 推理脚本 (scripts/inference.py)
-- [ ] 实现单图推理
-- [ ] 实现批量推理
-- [ ] 实现文件夹推理
-- [ ] 添加进度条
-- [ ] 生成结果报告
+首次运行会自动从HuggingFace下载 `llava-hf/llava-1.5-7b-hf` 模型（约13GB）。
 
-### 推理Shell脚本 (scripts/inference.sh)
-- [ ] 配置推理参数
-- [ ] 调用推理脚本
-- [ ] 设置输出路径
+## 参考文档
 
-### 模型优化
-- [ ] 模型量化（INT8）
-- [ ] 模型剪枝（可选）
-- [ ] ONNX导出
-- [ ] TensorRT优化（可选）
-
-### API部署（可选）
-- [ ] 实现Flask API
-- [ ] 实现FastAPI
-- [ ] 添加Docker支持
-- [ ] 编写API文档
-
----
-
-## 阶段6：文档与收尾（预计 0.5天）
-
-### 代码文档
-- [ ] 添加模块文档字符串
-- [ ] 添加函数文档字符串
-- [ ] 添加关键代码注释
-
-### 使用文档
-- [ ] 编写训练指南
-- [ ] 编写推理指南
-- [ ] 编写API使用说明
-- [ ] 添加常见问题解答
-
-### 实验报告
-- [ ] 汇总所有实验结果
-- [ ] 制作对比表格
-- [ ] 绘制性能曲线
-- [ ] 生成可视化报告
-
-### 项目打包
-- [ ] 创建requirements.txt
-- [ ] 添加LICENSE文件
-- [ ] 清理临时文件
-- [ ] 创建发布包
-
----
-
-## 验收标准
-
-### 功能验收
-- [ ] 可以成功训练模型
-- [ ] 训练过程中显存占用 < 6GB
-- [ ] 验证集准确率 > 85%
-- [ ] 可以进行单图推理
-- [ ] 可以进行批量推理
-
-### 性能验收
-- [ ] 训练时间 < 8小时 (4070Ti)
-- [ ] 推理速度 > 30 FPS
-- [ ] 模型文件大小 < 100MB
-
-### 代码验收
-- [ ] 代码风格统一
-- [ ] 关键函数有文档字符串
-- [ ] 测试覆盖主要功能
-- [ ] 可以复现实验结果
-
----
-
-## 备注
-
-- 每完成一项，将 `[ ]` 改为 `[x]`
-- 遇到问题记录在对应项下方
-- 建议按顺序完成各阶段任务
-- 阶段4的实验可以并行进行
-
----
-
-**最后更新**: 2025-06-07
+- `docs/PROJECT_MEMORY.md`：项目最新状态
+- `docs/ASSETS_EVALUATION_REPORT.md`：第一阶段评估结果
+- `docs/EXPLAINABILITY_DESIGN.md`：第二阶段设计方案
+- `docs/PROJECT_PLAN.md`：项目早期规划

@@ -1,5 +1,8 @@
 # LAIGCD: Lightweight AI-Generated Content Detector
 
+> 注：本文件保留为项目早期方案与技术规划，主要反映设计阶段的目标、假设和路线，不代表当前最新实验结论。
+> 当前真实进展请优先参考 `README.md`、`docs/PROJECT_MEMORY.md`、`docs/ASSETS_EVALUATION_REPORT.md`。
+
 ## 项目概述
 
 **目标**：构建一个轻量级的AI生成图像检测模型，数据需求 < 100GB，可在4070Ti上训练

@@ -32,14 +32,14 @@
 
 1. **实时图像检测演示**
    ```bash
-   python scripts/inference.py --image_path test.jpg --checkpoint checkpoints/best.pth
+   python scripts/inference.py test.jpg --checkpoint checkpoints/full_run/best_model.pth
    ```
    - 上传一张图片，立即判断是否为AI生成
    - 显示置信度和原型注意力权重
 
 2. **批量检测演示**
    ```bash
-   python scripts/inference.py --image_dir test_images/ --checkpoint checkpoints/best.pth
+   python scripts/inference.py --image_dir test_images/ --checkpoint checkpoints/full_run/best_model.pth
    ```
    - 批量检测文件夹中的所有图像
    - 生成检测报告

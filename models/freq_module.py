@@ -5,6 +5,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 
 
@@ -110,6 +111,36 @@ class FreqModule(nn.Module):
             nn.Dropout(0.1)
         )
 
+    @staticmethod
+    def _normalize_heatmap(heatmap):
+        """将热力图逐样本归一化到[0, 1]。"""
+        flat = heatmap.flatten(1)
+        min_vals = flat.min(dim=1, keepdim=True).values.view(-1, 1, 1)
+        max_vals = flat.max(dim=1, keepdim=True).values.view(-1, 1, 1)
+        return (heatmap - min_vals) / (max_vals - min_vals + 1e-6)
+
+    def apply_hpf(self, x):
+        """应用SRM高通滤波器。"""
+        return self.hpf(x)
+
+    def encode_filtered(self, filtered_x):
+        """对滤波响应进行编码。"""
+        return self.encoder(filtered_x)
+
+    def get_frequency_heatmap(self, x):
+        """
+        生成频域异常热力图。
+
+        Args:
+            x: [B, 3, H, W] 输入图像
+
+        Returns:
+            [B, H, W] 归一化频域热力图
+        """
+        filtered = self.apply_hpf(x)
+        heatmap = filtered.abs().mean(dim=1)
+        return self._normalize_heatmap(heatmap)
+
     def forward(self, x):
         """
         Args:
@@ -118,10 +149,10 @@ class FreqModule(nn.Module):
             [B, output_dim] 频域特征向量
         """
         # SRM滤波
-        x = self.hpf(x)  # [B, 30, H, W]
+        x = self.apply_hpf(x)  # [B, 30, H, W]
 
         # 编码
-        x = self.encoder(x)  # [B, output_dim]
+        x = self.encode_filtered(x)  # [B, output_dim]
 
         return x
 
@@ -148,6 +179,14 @@ class DCTModule(nn.Module):
             nn.Linear(64, output_dim)
         )
 
+    @staticmethod
+    def _normalize_heatmap(heatmap):
+        """将热力图逐样本归一化到[0, 1]。"""
+        flat = heatmap.flatten(1)
+        min_vals = flat.min(dim=1, keepdim=True).values.view(-1, 1, 1)
+        max_vals = flat.max(dim=1, keepdim=True).values.view(-1, 1, 1)
+        return (heatmap - min_vals) / (max_vals - min_vals + 1e-6)
+
     def _dct_transform(self, x):
         """简化的DCT变换（实际项目中建议使用pytorch-wavelets）"""
         # 这里使用FFT的实部作为DCT的近似
@@ -155,6 +194,26 @@ class DCTModule(nn.Module):
         fft = torch.fft.rfft2(x, norm='ortho')
         magnitude = torch.abs(fft)
         return magnitude
+
+    def get_frequency_heatmap(self, x):
+        """
+        生成DCT频域热力图。
+
+        Args:
+            x: [B, 3, H, W] 输入图像
+
+        Returns:
+            [B, H, W] 归一化频域热力图
+        """
+        magnitude = self._dct_transform(x)
+        heatmap = magnitude.mean(dim=1)
+        heatmap = F.interpolate(
+            heatmap.unsqueeze(1),
+            size=x.shape[-2:],
+            mode='bilinear',
+            align_corners=False
+        ).squeeze(1)
+        return self._normalize_heatmap(heatmap)
 
     def forward(self, x):
         """
@@ -165,9 +224,6 @@ class DCTModule(nn.Module):
         """
         # DCT变换
         x = self._dct_transform(x)  # [B, 3, H, W/2+1]
-
-        # 将复数张量转为实数
-        x = x.real  # [B, 3, H, W/2+1]
 
         # 编码
         x = self.encoder(x)  # [B, output_dim]

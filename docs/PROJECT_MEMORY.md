@@ -78,7 +78,7 @@ LAIGCD 的实现已经明显收敛到一个更具体的方向：
 项目从理想化的 `data/train|val/...` 目录，演进成直接兼容实际 Kaggle 数据集结构：
 
 - `utils/data.py` 已支持 140k 与 130k 两套数据结构
-- `datadownload.py` 已提供下载入口
+- 当前仓库未包含自动下载脚本，数据需手动放置到 `data/` 目录
 - `scripts/train.py` / `scripts/inference.py` / `scripts/eval.py` 已形成训练、推理、评估入口
 - 增加了日志、checkpoint、结果可视化脚本
 
@@ -227,7 +227,7 @@ LAIGCD 的实现已经明显收敛到一个更具体的方向：
 - **评估主入口**: `scripts/eval.py` ✅ 已修复
 - **阈值诊断**: `scripts/diagnose_threshold.py`
 - **最佳模型**: `checkpoints/full_run/best_model.pth`
-- **评估报告**: `ASSETS_EVALUATION_REPORT.md`
+- **评估报告**: `docs/ASSETS_EVALUATION_REPORT.md`
 
 ## 8. 快速使用指南
 
@@ -235,8 +235,8 @@ LAIGCD 的实现已经明显收敛到一个更具体的方向：
 
 ```bash
 python scripts/inference.py \
-  --checkpoint checkpoints/full_run/best_model.pth \
-  --image /path/to/image.jpg
+  /path/to/image.jpg \
+  --checkpoint checkpoints/full_run/best_model.pth
 ```
 
 ### 评估测试集
