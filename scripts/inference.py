@@ -24,6 +24,7 @@ from utils.metrics import compute_metrics, get_optimal_threshold
 
 
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+DEFAULT_THRESHOLD = 0.68
 
 
 def get_inference_transform(img_size=224):
@@ -95,7 +96,7 @@ def resolve_threshold(checkpoint, manual_threshold=None):
     if stored_threshold is not None:
         return float(stored_threshold), "checkpoint.metrics.threshold"
 
-    return 0.5, "fallback_default_0.5"
+    return DEFAULT_THRESHOLD, "fallback_default_0.68"
 
 
 def collect_images(image_dir):
@@ -128,7 +129,7 @@ def predict_fake_probability(model, image_path, transform, device="cuda"):
     return probs[0].item()
 
 
-def predict_single_image(model, image_path, transform, device="cuda", threshold=0.5):
+def predict_single_image(model, image_path, transform, device="cuda", threshold=DEFAULT_THRESHOLD):
     """预测单张图像"""
     image_path = Path(image_path)
     fake_probability = predict_fake_probability(model, image_path, transform, device)
@@ -144,7 +145,7 @@ def predict_single_image(model, image_path, transform, device="cuda", threshold=
     }
 
 
-def predict_directory(model, image_dir, transform, device="cuda", output_path=None, threshold=0.5):
+def predict_directory(model, image_dir, transform, device="cuda", output_path=None, threshold=DEFAULT_THRESHOLD):
     """预测目录中的所有图像"""
     image_dir = Path(image_dir)
     image_paths = collect_images(image_dir)
@@ -184,7 +185,7 @@ def evaluate_test_set(
     test_dir,
     transform,
     device="cuda",
-    threshold=0.5,
+    threshold=DEFAULT_THRESHOLD,
     threshold_source="manual_argument",
     output_path=None,
 ):

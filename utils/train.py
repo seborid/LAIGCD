@@ -217,7 +217,7 @@ def validate(model, dataloader, device, logger=None, find_optimal_threshold=Fals
     labels_np = all_labels.numpy()
 
     # 默认阈值0.5的指标
-    preds = (probs > 0.5).astype(int)
+    preds = (probs > 0.5).astype(int).flatten()  # 确保 (N,) 形状，避免广播错误
     accuracy = (preds == labels_np).mean()
 
     # 计算AP

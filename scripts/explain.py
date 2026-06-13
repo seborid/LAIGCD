@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import torch
 import matplotlib.pyplot as plt
 
-from scripts.inference import get_inference_transform, load_model
+from scripts.inference import DEFAULT_THRESHOLD, get_inference_transform, load_model
 from utils import (
     denormalize_image,
     tensor_to_heatmap,
@@ -45,7 +45,7 @@ def save_prototype_attention_chart(attn_weights, save_path):
     plt.close(fig)
 
 
-def build_explanation_result(model, image_path, transform, device='cuda'):
+def build_explanation_result(model, image_path, transform, device='cuda', threshold=DEFAULT_THRESHOLD):
     """对单张图片生成解释结果。"""
     image = Image.open(image_path).convert('RGB')
     image_tensor = transform(image).unsqueeze(0).to(device)
@@ -74,13 +74,14 @@ def build_explanation_result(model, image_path, transform, device='cuda'):
         ]
 
     fake_probability = float(result['probabilities'][0].item())
-    prediction = 'Fake' if int(result['predictions'][0].item()) == 1 else 'Real'
+    prediction = 'Fake' if fake_probability >= threshold else 'Real'
 
     summary = {
         'path': str(image_path),
         'prediction': prediction,
         'fake_probability': fake_probability,
         'confidence': fake_probability if prediction == 'Fake' else 1 - fake_probability,
+        'threshold': threshold,
         'top_prototypes': top_prototypes,
         'spatial_peak_regions': summarize_peaks(spatial_heatmap, top_k=3),
         'frequency_peak_regions': summarize_peaks(frequency_heatmap, top_k=3) if frequency_heatmap is not None else [],
@@ -186,6 +187,7 @@ def main():
     parser.add_argument('--output_dir', type=str, default='explanations', help='结果输出目录')
     parser.add_argument('--img_size', type=int, default=224, help='输入图像大小')
     parser.add_argument('--device', type=str, default='cuda', help='设备')
+    parser.add_argument('--threshold', type=float, default=DEFAULT_THRESHOLD, help='Fake 判定阈值')
 
     # FakeVLM相关参数
     parser.add_argument('--use_fakevlm', action='store_true', help='启用FakeVLM自然语言解释')
@@ -217,7 +219,7 @@ def main():
 
     def process_single_image(image_path):
         """处理单张图像的完整流程"""
-        explanation = build_explanation_result(model, image_path, transform, device)
+        explanation = build_explanation_result(model, image_path, transform, device, args.threshold)
         image_output_dir = output_dir / Path(image_path).stem
         save_explanation_outputs(explanation, image_output_dir)
 
