@@ -35,6 +35,7 @@ python main.py
 - 参数:
   - `image`: 图片文件（必填）
   - `threshold`: 检测阈值（可选，默认使用 `0.68`）
+  - `explain`: 是否调用第二阶段 FakeVLM 生成理由（可选，默认 `true`，传 `false` 跳过 7B 推理）
 
 **响应:**
 ```json
@@ -44,7 +45,8 @@ python main.py
   "fake_probability": 0.85,
   "threshold": 0.68,
   "spatial_overlay": "base64编码的PNG图像",
-  "frequency_overlay": "base64编码的PNG图像"
+  "frequency_overlay": "base64编码的PNG图像",
+  "reasoning": "FakeVLM生成的真伪理由（英文），explain=false或失败时为null"
 }
 ```
 

@@ -298,7 +298,7 @@ def save_checkpoint(model, optimizer, scheduler, epoch, metrics, filepath, ema_m
 
 def load_checkpoint(filepath, model, optimizer=None, scheduler=None, ema_model=None):
     """加载检查点"""
-    checkpoint = torch.load(filepath, map_location='cpu')
+    checkpoint = torch.load(filepath, map_location='cpu', weights_only=False)
 
     model.load_state_dict(checkpoint['model_state_dict'])
 

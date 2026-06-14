@@ -13,3 +13,11 @@ matplotlib>=3.7.0
 
 # 其他工具
 scikit-learn>=1.3.0
+
+# 第二阶段 FakeVLM（LLaVA-1.5-7B）推理依赖
+transformers>=4.45.0      # LlavaForConditionalGeneration / AutoProcessor
+bitsandbytes>=0.43.0      # 8-bit 量化（12GB 显存下加载 7B 模型必需）
+accelerate>=0.30.0        # device_map="auto" + 8-bit 加载所需
+sentencepiece>=0.2.0      # LLaVA 分词器
+einops>=0.8.0
+
